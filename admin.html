@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Painel Admin | PowerKing</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { background: #000; color: #fff; font-family: 'Poppins', sans-serif; padding: 20px; }
+        .container { max-width: 700px; margin: auto; border: 1px solid #d4af37; padding: 30px; border-radius: 15px; background: #0a0a0a; }
+        
+        .logo-admin { display: block; height: 60px; margin: 0 auto 20px; }
+        h1 { color: #d4af37; text-align: center; margin-bottom: 30px; font-size: 1.5rem; text-transform: uppercase; letter-spacing: 2px; }
+        
+        label { color: #d4af37; font-size: 0.9rem; font-weight: bold; display: block; margin-top: 15px; }
+        input, select { width: 100%; padding: 12px; margin: 8px 0 10px 0; background: #1a1a1a; border: 1px solid #333; color: #fff; border-radius: 8px; outline: none; transition: 0.3s; font-family: 'Poppins'; }
+        input:focus, select:focus { border-color: #d4af37; }
+        
+        .btn-main { width: 100%; padding: 15px; background: #d4af37; border: none; font-weight: bold; cursor: pointer; border-radius: 8px; color: #000; text-transform: uppercase; transition: 0.3s; margin-top: 20px; }
+        .btn-main:hover { background: #fff; }
+        
+        .item-lista { display: flex; justify-content: space-between; align-items: center; background: #1a1a1a; padding: 15px; margin-top: 15px; border-radius: 10px; border: 1px solid #222; }
+        .info-prod { display: flex; align-items: center; gap: 15px; }
+        .img-preview { width: 60px; height: 60px; object-fit: cover; border-radius: 6px; border: 1px solid #333; background: #000; }
+        
+        .badge-cat { font-size: 0.7rem; background: #333; color: #d4af37; padding: 2px 8px; border-radius: 4px; text-transform: uppercase; margin-top: 5px; display: inline-block; }
+
+        .actions { display: flex; gap: 10px; }
+        .btn-edit { background: #2196F3; border: none; padding: 8px 12px; color: white; border-radius: 5px; cursor: pointer; font-size: 0.8rem; }
+        .btn-delete { background: #ff4444; border: none; padding: 8px 12px; color: white; border-radius: 5px; cursor: pointer; font-size: 0.8rem; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <img src="logo.png" alt="PowerKing" class="logo-admin">
+        <h1>Gerenciador de Estoque</h1>
+        
+        <div id="formulario">
+            <h3 id="form-title" style="color: #fff; margin-bottom: 15px;">Cadastrar Novo Produto</h3>
+            
+            <label>Nome do Suplemento</label>
+            <input type="text" id="nome" placeholder="Ex: Whey Protein Isolado">
+            
+            <label>Categoria</label>
+            <select id="categoria">
+                <option value="Whey Protein">Whey Protein</option>
+                <option value="Creatina">Creatina</option>
+                <option value="Termogênico">Termogênico</option>
+                <option value="Pasta de Amendoim">Pasta de Amendoim</option>
+                <option value="Pré-Treino">Pré-Treino</option>
+            </select>
+
+            <label>Preço de Venda (R$)</label>
+            <input type="text" id="preco" placeholder="Ex: 149,90">
+            
+            <label>Link da Imagem</label>
+            <input type="text" id="imagem" placeholder="https://link-da-foto.com/imagem.jpg">
+            
+            <button id="btnSalvar" class="btn-main">Salvar no Site</button>
+            <button id="btnCancelar" class="btn-main" style="background: #333; color: #fff; display:none;">Cancelar Edição</button>
+        </div>
+
+        <hr style="border: 0; border-top: 1px solid #222; margin: 40px 0;">
+
+        <h3 style="color: #d4af37; margin-bottom: 20px;">Produtos na Vitrine</h3>
+        <div id="lista-produtos">Carregando estoque...</div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getDatabase, ref, push, onValue, remove, update } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+        const firebaseConfig = { 
+            apiKey: "AIzaSyAqbsFZB0JT89x7Nio70x0QkAPxqxz3SK4", 
+            authDomain: "powerkingsuplementos.firebaseapp.com", 
+            databaseURL: "https://powerkingsuplementos-default-rtdb.firebaseio.com",
+            projectId: "powerkingsuplementos", 
+            storageBucket: "powerkingsuplementos.firebasestorage.app", 
+            messagingSenderId: "582983617567", 
+            appId: "1:582983617567:web:c701a9239b007b3a88d92a" 
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+        const produtosRef = ref(db, 'produtos');
+
+        let editId = null;
+
+        const inputNome = document.getElementById('nome');
+        const selectCategoria = document.getElementById('categoria');
+        const inputPreco = document.getElementById('preco');
+        const inputImagem = document.getElementById('imagem');
+        const btnSalvar = document.getElementById('btnSalvar');
+        const btnCancelar = document.getElementById('btnCancelar');
+        const formTitle = document.getElementById('form-title');
+
+        btnSalvar.onclick = () => {
+            const nome = inputNome.value;
+            const categoria = selectCategoria.value;
+            const preco = inputPreco.value;
+            const imagem = inputImagem.value;
+
+            if(nome && preco && imagem) {
+                const dados = { nome, categoria, preco, imagem };
+                
+                if(editId) {
+                    update(ref(db, 'produtos/' + editId), dados).then(() => {
+                        alert("Produto atualizado!");
+                        resetForm();
+                    });
+                } else {
+                    push(produtosRef, dados).then(() => {
+                        alert("Produto cadastrado!");
+                        resetForm();
+                    });
+                }
+            } else {
+                alert("Preencha todos os campos!");
+            }
+        };
+
+        onValue(produtosRef, (snapshot) => {
+            const lista = document.getElementById('lista-produtos');
+            lista.innerHTML = "";
+            const data = snapshot.val();
+
+            if (!data) {
+                lista.innerHTML = "<p style='color:#555;'>Nenhum produto cadastrado.</p>";
+                return;
+            }
+
+            Object.keys(data).forEach(key => {
+                const p = data[key];
+                lista.innerHTML += `
+                    <div class="item-lista">
+                        <div class="info-prod">
+                            <img src="${p.imagem}" class="img-preview" onerror="this.src='https://via.placeholder.com/60'">
+                            <div>
+                                <strong style="color:#fff;">${p.nome}</strong><br>
+                                <span class="badge-cat">${p.categoria || 'Geral'}</span><br>
+                                <span style="color:#d4af37;">R$ ${p.preco}</span>
+                            </div>
+                        </div>
+                        <div class="actions">
+                            <button class="btn-edit" onclick="prepararEdicao('${key}', '${p.nome}', '${p.categoria || 'Whey Protein'}', '${p.preco}', '${p.imagem}')">Editar</button>
+                            <button class="btn-delete" onclick="deletarItem('${key}')">Excluir</button>
+                        </div>
+                    </div>
+                `;
+            });
+        });
+
+        window.prepararEdicao = (id, nome, categoria, preco, imagem) => {
+            editId = id;
+            inputNome.value = nome;
+            selectCategoria.value = categoria;
+            inputPreco.value = preco;
+            inputImagem.value = imagem;
+            
+            formTitle.innerText = "Editando Produto";
+            formTitle.style.color = "#2196F3";
+            btnSalvar.innerText = "Atualizar Produto";
+            btnSalvar.style.background = "#2196F3";
+            btnCancelar.style.display = "block";
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        };
+
+        btnCancelar.onclick = resetForm;
+
+        function resetForm() {
+            editId = null;
+            inputNome.value = "";
+            inputPreco.value = "";
+            inputImagem.value = "";
+            formTitle.innerText = "Cadastrar Novo Produto";
+            formTitle.style.color = "#fff";
+            btnSalvar.innerText = "Salvar no Site";
+            btnSalvar.style.background = "#d4af37";
+            btnCancelar.style.display = "none";
+        }
+
+        window.deletarItem = (id) => {
+            if(confirm("Remover este produto?")) remove(ref(db, 'produtos/' + id));
+        };
+    </script>
+</body>
+</html>
